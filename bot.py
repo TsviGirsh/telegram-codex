@@ -23,6 +23,24 @@ PROJECT_DIR = Path(os.getenv("PROJECT_DIR", "/home/dev/my-proj")).expanduser().r
 codex_lock = asyncio.Lock()
 
 
+def validate_repo_writable(repo_dir: Path) -> None:
+    repo_dir = repo_dir.expanduser().resolve()
+    if repo_dir != PROJECT_DIR:
+        raise RuntimeError(f"repo_dir must be PROJECT_DIR: {PROJECT_DIR}")
+
+    checks = [
+        repo_dir / ".codex_write_test",
+        repo_dir / ".git" / ".codex_git_write_test",
+    ]
+
+    for path in checks:
+        try:
+            path.write_text("ok")
+            path.unlink()
+        except Exception as exc:
+            raise RuntimeError(f"Bot cannot write to {path}: {exc}") from exc
+
+
 def require_config() -> int:
     if not TELEGRAM_BOT_TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN must be set.")
@@ -49,6 +67,8 @@ def require_config() -> int:
         raise RuntimeError("git must be installed and available on PATH.") from exc
     if git_check.returncode != 0 or git_check.stdout.strip() != "true":
         raise RuntimeError(f"PROJECT_DIR must be a Git repository: {PROJECT_DIR}")
+
+    validate_repo_writable(PROJECT_DIR)
 
     return allowed_user_id
 
