@@ -76,6 +76,41 @@ def create_git_branch(branch_name: str) -> None:
         raise RuntimeError(f"Failed to create Git branch {branch_name}: {error}")
 
 
+def commit_branch() -> None:
+    status = subprocess.run(
+        ["git", "-C", str(PROJECT_DIR), "status", "--porcelain"],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if status.returncode != 0:
+        error = status.stderr.strip() or status.stdout.strip()
+        raise RuntimeError(f"Failed to inspect Git changes: {error}")
+
+    if not status.stdout.strip():
+        return
+
+    add_result = subprocess.run(
+        ["git", "-C", str(PROJECT_DIR), "add", "-A"],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if add_result.returncode != 0:
+        error = add_result.stderr.strip() or add_result.stdout.strip()
+        raise RuntimeError(f"Failed to stage Git changes: {error}")
+
+    commit_result = subprocess.run(
+        ["git", "-C", str(PROJECT_DIR), "commit", "-m", "Codex changes"],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if commit_result.returncode != 0:
+        error = commit_result.stderr.strip() or commit_result.stdout.strip()
+        raise RuntimeError(f"Failed to commit Git changes: {error}")
+
+
 def require_config() -> int:
     if not TELEGRAM_BOT_TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN must be set.")
@@ -207,6 +242,11 @@ async def run_codex(prompt: str) -> str:
 
     if not result:
         result = errors
+
+    try:
+        commit_branch()
+    except RuntimeError as exc:
+        return f"{result}\n\nGit commit failed: {exc}"
 
     return result
 

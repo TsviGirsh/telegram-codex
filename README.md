@@ -80,6 +80,8 @@ in BotFather for the second environment.
   while running to catch accidental duplicate local starts.
 - Before each Codex task, the bot creates or switches to a daily Git branch in
   `PROJECT_DIR` using monthday format, such as `jun14`.
+- After a successful Codex task, the bot stages and commits any Git changes on
+  that branch with the message `Codex changes`.
 - Codex runs in `PROJECT_DIR` with:
 
 ```bash

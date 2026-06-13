@@ -115,7 +115,51 @@ def test_create_git_branch_rejects_invalid_branch_name(
         bot.create_git_branch("feature/jun14")
 
 
-def test_run_codex_creates_branch_before_executing_from_project_dir(
+def test_commit_branch_commits_project_dir_changes(
+    monkeypatch: pytest.MonkeyPatch,
+    project_dir: Path,
+) -> None:
+    bot = import_bot_with_project_dir(monkeypatch, project_dir)
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        if cmd[3:5] == ["status", "--porcelain"]:
+            return subprocess.CompletedProcess(cmd, 0, " M bot.py\n", "")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(bot.subprocess, "run", fake_run)
+
+    bot.commit_branch()
+
+    assert [call[0] for call in calls] == [
+        ["git", "-C", str(project_dir), "status", "--porcelain"],
+        ["git", "-C", str(project_dir), "add", "-A"],
+        ["git", "-C", str(project_dir), "commit", "-m", "Codex changes"],
+    ]
+
+
+def test_commit_branch_skips_commit_without_changes(
+    monkeypatch: pytest.MonkeyPatch,
+    project_dir: Path,
+) -> None:
+    bot = import_bot_with_project_dir(monkeypatch, project_dir)
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(bot.subprocess, "run", fake_run)
+
+    bot.commit_branch()
+
+    assert [call[0] for call in calls] == [
+        ["git", "-C", str(project_dir), "status", "--porcelain"],
+    ]
+
+
+def test_run_codex_creates_branch_executes_from_project_dir_then_commits(
     monkeypatch: pytest.MonkeyPatch,
     project_dir: Path,
 ) -> None:
@@ -132,6 +176,9 @@ def test_run_codex_creates_branch_before_executing_from_project_dir(
     def fake_create_git_branch(branch_name: str) -> None:
         calls.append(("branch", branch_name))
 
+    def fake_commit_branch() -> None:
+        calls.append(("commit", None))
+
     async def fake_create_subprocess_exec(*cmd, **kwargs):
         calls.append(("codex", cmd))
         captured["kwargs"] = kwargs
@@ -139,6 +186,7 @@ def test_run_codex_creates_branch_before_executing_from_project_dir(
 
     monkeypatch.setattr(bot, "branch_name_for_today", lambda: "jun14")
     monkeypatch.setattr(bot, "create_git_branch", fake_create_git_branch)
+    monkeypatch.setattr(bot, "commit_branch", fake_commit_branch)
     monkeypatch.setattr(
         asyncio,
         "create_subprocess_exec",
@@ -163,5 +211,6 @@ def test_run_codex_creates_branch_before_executing_from_project_dir(
                 "fix it",
             ),
         ),
+        ("commit", None),
     ]
     assert captured["kwargs"]["cwd"] == str(project_dir)
