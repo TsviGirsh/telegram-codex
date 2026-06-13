@@ -1,8 +1,10 @@
 import asyncio
 import fcntl
 import os
+import re
 import signal
 import subprocess
+from datetime import date
 from pathlib import Path
 
 from telegram import Update
@@ -21,6 +23,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ALLOWED_USER_ID_RAW = os.getenv("ALLOWED_USER_ID")
 PROJECT_DIR = Path(os.getenv("PROJECT_DIR", "/home/dev/my-proj")).expanduser().resolve()
 codex_lock = asyncio.Lock()
+BRANCH_NAME_PATTERN = re.compile(r"^[a-z]{3}\d{1,2}$")
 
 
 def validate_repo_writable(repo_dir: Path) -> None:
@@ -39,6 +42,38 @@ def validate_repo_writable(repo_dir: Path) -> None:
             path.unlink()
         except Exception as exc:
             raise RuntimeError(f"Bot cannot write to {path}: {exc}") from exc
+
+
+def branch_name_for_today(today: date | None = None) -> str:
+    today = today or date.today()
+    return f"{today.strftime('%b').lower()}{today.day}"
+
+
+def create_git_branch(branch_name: str) -> None:
+    if not BRANCH_NAME_PATTERN.fullmatch(branch_name):
+        raise RuntimeError(
+            "branch_name must use monthday format, for example 'jun14'."
+        )
+
+    branch_ref = f"refs/heads/{branch_name}"
+    branch_exists = subprocess.run(
+        ["git", "-C", str(PROJECT_DIR), "show-ref", "--verify", "--quiet", branch_ref],
+        check=False,
+    )
+    if branch_exists.returncode == 0:
+        cmd = ["git", "-C", str(PROJECT_DIR), "switch", branch_name]
+    else:
+        cmd = ["git", "-C", str(PROJECT_DIR), "switch", "-c", branch_name]
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if result.returncode != 0:
+        error = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"Failed to create Git branch {branch_name}: {error}")
 
 
 def require_config() -> int:
@@ -133,11 +168,11 @@ async def stop_process(process: asyncio.subprocess.Process) -> None:
 
 
 async def run_codex(prompt: str) -> str:
+    create_git_branch(branch_name_for_today())
+
     cmd = [
         "codex",
         "exec",
-        "--cd", str(PROJECT_DIR),
-        "--skip-git-repo-check",
         "--sandbox",
         "workspace-write",
         "--ephemeral",

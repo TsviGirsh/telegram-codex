@@ -78,10 +78,13 @@ in BotFather for the second environment.
   busy, the bot replies that a task is already running.
 - Only one local `bot.py` process can run at a time. The bot writes `.bot.lock`
   while running to catch accidental duplicate local starts.
+- Before each Codex task, the bot creates or switches to a daily Git branch in
+  `PROJECT_DIR` using monthday format, such as `jun14`.
 - Codex runs in `PROJECT_DIR` with:
 
 ```bash
-codex exec --cd "$PROJECT_DIR" --skip-git-repo-check --sandbox workspace-write --ephemeral "<your prompt>"
+cd "$PROJECT_DIR"
+codex exec --sandbox workspace-write --ephemeral "<your prompt>"
 ```
 
 - The subprocess receives a small allowlisted environment so Telegram secrets

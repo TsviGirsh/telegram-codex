@@ -1,6 +1,8 @@
+import asyncio
 import importlib
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -56,3 +58,108 @@ def test_validate_repo_writable_rejects_non_project_dir(
 
     with pytest.raises(RuntimeError, match="repo_dir must be PROJECT_DIR"):
         bot.validate_repo_writable(other_dir)
+
+
+def test_branch_name_for_today_uses_monthday_format(
+    monkeypatch: pytest.MonkeyPatch,
+    project_dir: Path,
+) -> None:
+    bot = import_bot_with_project_dir(monkeypatch, project_dir)
+
+    assert bot.branch_name_for_today(date(2026, 6, 14)) == "jun14"
+
+
+def test_create_git_branch_creates_branch_on_project_dir(
+    monkeypatch: pytest.MonkeyPatch,
+    project_dir: Path,
+) -> None:
+    bot = import_bot_with_project_dir(monkeypatch, project_dir)
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        if cmd[3:6] == ["show-ref", "--verify", "--quiet"]:
+            return subprocess.CompletedProcess(cmd, 1, "", "")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(bot.subprocess, "run", fake_run)
+
+    bot.create_git_branch("jun14")
+
+    assert calls[0][0] == [
+        "git",
+        "-C",
+        str(project_dir),
+        "show-ref",
+        "--verify",
+        "--quiet",
+        "refs/heads/jun14",
+    ]
+    assert calls[1][0] == [
+        "git",
+        "-C",
+        str(project_dir),
+        "switch",
+        "-c",
+        "jun14",
+    ]
+
+
+def test_create_git_branch_rejects_invalid_branch_name(
+    monkeypatch: pytest.MonkeyPatch,
+    project_dir: Path,
+) -> None:
+    bot = import_bot_with_project_dir(monkeypatch, project_dir)
+
+    with pytest.raises(RuntimeError, match="monthday format"):
+        bot.create_git_branch("feature/jun14")
+
+
+def test_run_codex_creates_branch_before_executing_from_project_dir(
+    monkeypatch: pytest.MonkeyPatch,
+    project_dir: Path,
+) -> None:
+    bot = import_bot_with_project_dir(monkeypatch, project_dir)
+    calls = []
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        returncode = 0
+
+        async def communicate(self):
+            return b"done", b""
+
+    def fake_create_git_branch(branch_name: str) -> None:
+        calls.append(("branch", branch_name))
+
+    async def fake_create_subprocess_exec(*cmd, **kwargs):
+        calls.append(("codex", cmd))
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(bot, "branch_name_for_today", lambda: "jun14")
+    monkeypatch.setattr(bot, "create_git_branch", fake_create_git_branch)
+    monkeypatch.setattr(
+        asyncio,
+        "create_subprocess_exec",
+        fake_create_subprocess_exec,
+    )
+
+    result = asyncio.run(bot.run_codex("fix it"))
+
+    assert result == "done"
+    assert calls == [
+        ("branch", "jun14"),
+        (
+            "codex",
+            (
+                "codex",
+                "exec",
+                "--sandbox",
+                "workspace-write",
+                "--ephemeral",
+                "fix it",
+            ),
+        ),
+    ]
+    assert captured["kwargs"]["cwd"] == str(project_dir)
