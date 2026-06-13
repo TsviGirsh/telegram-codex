@@ -9,6 +9,7 @@ splits long Codex output into Telegram-sized replies.
 ## Prerequisites
 
 - Python 3.13 or compatible Python 3 version
+- uv installed and available on `PATH`
 - Git installed and available on `PATH`
 - Codex CLI installed and available on `PATH`
 - A Telegram bot token from BotFather
@@ -17,17 +18,10 @@ splits long Codex output into Telegram-sized replies.
 
 ## Setup
 
-Create and activate a virtual environment:
+Create the virtual environment and install dependencies:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 Create a `.env` file in this directory:
@@ -46,7 +40,7 @@ the token, allowed user ID, Git, or project directory check fails.
 Start the bot:
 
 ```bash
-python3 bot.py
+uv run python bot.py
 ```
 
 In Telegram, send `/start` to the bot from the allowed account, then send a
@@ -70,7 +64,7 @@ Stop the extra process, or stop any deployment/service using the same bot token,
 then start only one copy:
 
 ```bash
-python3 bot.py
+uv run python bot.py
 ```
 
 If the conflicting process is running on another machine, this repository cannot
@@ -87,7 +81,7 @@ in BotFather for the second environment.
 - Codex runs in `PROJECT_DIR` with:
 
 ```bash
-codex exec --sandbox workspace-write --ephemeral "<your prompt>"
+codex exec --cd "$PROJECT_DIR" --skip-git-repo-check --sandbox workspace-write --ephemeral "<your prompt>"
 ```
 
 - The subprocess receives a small allowlisted environment so Telegram secrets
@@ -96,5 +90,5 @@ codex exec --sandbox workspace-write --ephemeral "<your prompt>"
 
 ## Notes
 
-Make sure the user running `python3 bot.py` can access both the Codex CLI
+Make sure the user running `uv run python bot.py` can access both the Codex CLI
 configuration and the target `PROJECT_DIR`.

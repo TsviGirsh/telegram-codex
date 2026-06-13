@@ -116,6 +116,8 @@ async def run_codex(prompt: str) -> str:
     cmd = [
         "codex",
         "exec",
+        "--cd", str(PROJECT_DIR),
+        "--skip-git-repo-check",
         "--sandbox",
         "workspace-write",
         "--ephemeral",
