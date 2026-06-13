@@ -83,8 +83,7 @@ in BotFather for the second environment.
 - Codex runs in `PROJECT_DIR` with:
 
 ```bash
-cd "$PROJECT_DIR"
-codex exec --sandbox workspace-write --ephemeral "<your prompt>"
+codex exec --cd "$PROJECT_DIR" --sandbox workspace-write --ephemeral "<your prompt>"
 ```
 
 - The subprocess receives a small allowlisted environment so Telegram secrets

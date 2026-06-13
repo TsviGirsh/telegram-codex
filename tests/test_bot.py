@@ -155,6 +155,8 @@ def test_run_codex_creates_branch_before_executing_from_project_dir(
             (
                 "codex",
                 "exec",
+                "--cd",
+                str(project_dir),
                 "--sandbox",
                 "workspace-write",
                 "--ephemeral",

@@ -173,6 +173,8 @@ async def run_codex(prompt: str) -> str:
     cmd = [
         "codex",
         "exec",
+        "--cd",
+        str(PROJECT_DIR),
         "--sandbox",
         "workspace-write",
         "--ephemeral",
